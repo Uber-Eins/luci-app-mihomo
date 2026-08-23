@@ -1,0 +1,100 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-mihomo\n"
+"PO-Revision-Date: 2026-08-23 00:00+0800\n"
+"Last-Translator: Camellia\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Mihomo"
+msgstr ""
+
+msgid "Overview"
+msgstr ""
+
+msgid "Configuration"
+msgstr ""
+
+msgid "Overrides"
+msgstr ""
+
+msgid "Logs"
+msgstr ""
+
+msgid "Mihomo overview"
+msgstr ""
+
+msgid "Mihomo configuration"
+msgstr ""
+
+msgid "YAML overrides"
+msgstr ""
+
+msgid "Mihomo logs"
+msgstr ""
+
+msgid "Start"
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid "Restart"
+msgstr ""
+
+msgid "Reload"
+msgstr ""
+
+msgid "Validate and apply"
+msgstr ""
+
+msgid "Save draft"
+msgstr ""
+
+msgid "Preview"
+msgstr ""
+
+msgid "Apply preview"
+msgstr ""
+
+msgid "Traffic history"
+msgstr ""
+
+msgid "Live topology"
+msgstr ""
+
+msgid "Historical usage"
+msgstr ""
+
+msgid "Proxy providers"
+msgstr ""
+
+msgid "Rule hits"
+msgstr ""
+
+msgid "Active connections"
+msgstr ""
+
+msgid "Public IP"
+msgstr ""
+
+msgid "Check public IP"
+msgstr ""
+
+msgid "Clear history"
+msgstr ""
+
+msgid "Source · config.base.yaml"
+msgstr ""
+
+msgid "Effective · config.yaml"
+msgstr ""
+
+msgid "Add override"
+msgstr ""
+
+msgid "Clear view"
+msgstr ""

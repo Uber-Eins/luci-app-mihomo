@@ -1,0 +1,89 @@
+{
+	"admin/services/mihomo": {
+		"title": "Mihomo",
+		"order": 65,
+		"action": {
+			"type": "firstchild"
+		},
+		"depends": {
+			"acl": [ "luci-app-mihomo" ],
+			"fs": {
+				"/usr/sbin/luci-mihomo": "executable"
+			}
+		}
+	},
+	"admin/services/mihomo/overview": {
+		"title": "Overview",
+		"order": 1,
+		"action": {
+			"type": "view",
+			"path": "mihomo/overview"
+		},
+		"depends": {
+			"acl": [ "luci-app-mihomo" ]
+		}
+	},
+	"admin/services/mihomo/config": {
+		"title": "Configuration",
+		"order": 2,
+		"action": {
+			"type": "view",
+			"path": "mihomo/config"
+		},
+		"depends": {
+			"acl": [ "luci-app-mihomo-write" ]
+		}
+	},
+	"admin/services/mihomo/overrides": {
+		"title": "Overrides",
+		"order": 3,
+		"action": {
+			"type": "view",
+			"path": "mihomo/overrides"
+		},
+		"depends": {
+			"acl": [ "luci-app-mihomo-write" ]
+		}
+	},
+	"admin/services/mihomo/logs": {
+		"title": "Logs",
+		"order": 4,
+		"action": {
+			"type": "view",
+			"path": "mihomo/logs"
+		},
+		"depends": {
+			"acl": [ "luci-app-mihomo" ]
+		}
+	},
+	"admin/services/mihomo/api/read/*": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.mihomo",
+			"function": "api_read"
+		},
+		"auth": {
+			"methods": [ "cookie:sysauth_https", "cookie:sysauth_http" ],
+			"login": true
+		},
+		"depends": {
+			"acl": [ "luci-app-mihomo" ]
+		}
+	},
+	"admin/services/mihomo/api/write/*": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.mihomo",
+			"function": "api_write",
+			"post": true
+		},
+		"auth": {
+			"methods": [ "cookie:sysauth_https", "cookie:sysauth_http" ],
+			"login": true
+		},
+		"depends": {
+			"acl": [ "luci-app-mihomo-write" ]
+		}
+	}
+}
+

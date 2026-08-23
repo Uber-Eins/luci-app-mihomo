@@ -1,0 +1,206 @@
+name: Build mediatek/filogic APK
+
+on:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+env:
+  IMMORTALWRT_VERSION: "25.12.1"
+  IMMORTALWRT_REVISION: "r37978-cd0a06bfd3fd"
+  SDK_FILENAME: immortalwrt-sdk-25.12.1-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+  SDK_DIRNAME: immortalwrt-sdk-25.12.1-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64
+  SDK_SHA256: 1dede7c6afa3184eda37511e47a628f6674d2da2ce99a65f788f910ec57c9e5a
+  SDK_URL: https://downloads.immortalwrt.org/releases/25.12.1/targets/mediatek/filogic/immortalwrt-sdk-25.12.1-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+  PACKAGE_ARCH: aarch64_cortex-a53
+
+jobs:
+  build:
+    name: Cross-compile APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install SDK prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential bison clang curl fakeroot file flex g++ gawk gcc-multilib \
+            gettext git libelf-dev libncurses-dev libssl-dev python3 \
+            python3-setuptools rsync swig unzip wget zlib1g-dev zstd
+
+      - name: Cache ImmortalWrt SDK archive
+        id: sdk-cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.tool_cache }}/${{ env.SDK_FILENAME }}
+          key: immortalwrt-sdk-${{ env.IMMORTALWRT_VERSION }}-mediatek-filogic-${{ env.SDK_SHA256 }}
+
+      - name: Download ImmortalWrt SDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "${RUNNER_TOOL_CACHE}"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output "${RUNNER_TOOL_CACHE}/${SDK_FILENAME}" "${SDK_URL}"
+
+      - name: Verify and extract SDK
+        run: |
+          echo "${SDK_SHA256}  ${RUNNER_TOOL_CACHE}/${SDK_FILENAME}" | sha256sum --check -
+          tar --zstd --extract --file "${RUNNER_TOOL_CACHE}/${SDK_FILENAME}" \
+            --directory "${RUNNER_TEMP}"
+          echo "SDK_DIR=${RUNNER_TEMP}/${SDK_DIRNAME}" >> "${GITHUB_ENV}"
+
+      - name: Prepare feeds
+        run: |
+          cd "${SDK_DIR}"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Stage package source
+        run: |
+          mkdir -p "${SDK_DIR}/package/luci-app-mihomo"
+          rsync --archive \
+            --exclude=.build \
+            --exclude=.git \
+            ./ "${SDK_DIR}/package/luci-app-mihomo/"
+
+      - name: Configure SDK
+        run: |
+          cd "${SDK_DIR}"
+          make defconfig
+          grep --quiet '^CONFIG_TARGET_mediatek_filogic=y' .config
+          grep --quiet '^CONFIG_PACKAGE_luci-app-mihomo=m' .config
+
+      - name: Build APK packages
+        run: |
+          cd "${SDK_DIR}"
+          make -j2 package/luci-app-mihomo/compile V=s
+
+      - name: Verify architecture and collect artifacts
+        run: |
+          cd "${SDK_DIR}"
+          binary="build_dir/target-aarch64_cortex-a53_musl/luci-app-mihomo/.pkgdir/luci-app-mihomo/usr/sbin/luci-mihomo"
+          package_dir="bin/packages/${PACKAGE_ARCH}/base"
+          dist="${GITHUB_WORKSPACE}/dist"
+
+          test -x "${binary}"
+          file "${binary}"
+          readelf --file-header "${binary}" > "${RUNNER_TEMP}/luci-mihomo-elf-header.txt"
+          grep --quiet 'Machine:.*AArch64' "${RUNNER_TEMP}/luci-mihomo-elf-header.txt"
+
+          shopt -s nullglob
+          app_packages=("${package_dir}"/luci-app-mihomo-*.apk)
+          i18n_packages=("${package_dir}"/luci-i18n-mihomo-zh-cn-*.apk)
+          test "${#app_packages[@]}" -eq 1
+          test "${#i18n_packages[@]}" -eq 1
+
+          metadata="$(staging_dir/host/bin/apk adbdump "${app_packages[0]}")"
+          grep --quiet 'arch: aarch64_cortex-a53' <<< "${metadata}"
+          grep --quiet '^  replaces:' <<< "${metadata}"
+          grep --quiet '^    - mihomo$' <<< "${metadata}"
+          staging_dir/host/bin/apk verify --allow-untrusted "${app_packages[0]}"
+          staging_dir/host/bin/apk verify --allow-untrusted "${i18n_packages[0]}"
+
+          extracted="${RUNNER_TEMP}/luci-app-mihomo-package"
+          mkdir "${extracted}"
+          staging_dir/host/bin/apk extract --allow-untrusted \
+            --destination "${extracted}" "${app_packages[0]}"
+          test -x "${extracted}/etc/init.d/luci-mihomo"
+          test -x "${extracted}/etc/init.d/mihomo"
+          test -x "${extracted}/usr/share/luci-mihomo/mihomo.init.core"
+          grep --quiet '^# Managed by luci-app-mihomo\.$' \
+            "${extracted}/etc/init.d/mihomo"
+          grep --quiet '^[[:space:]]*procd_set_param stdout 0$' \
+            "${extracted}/etc/init.d/mihomo"
+          grep --quiet '^[[:space:]]*procd_set_param stderr 0$' \
+            "${extracted}/etc/init.d/mihomo"
+
+          mkdir -p "${dist}"
+          cp "${app_packages[0]}" "${dist}/luci-app-mihomo-mediatek-filogic.apk"
+          cp "${i18n_packages[0]}" "${dist}/luci-i18n-mihomo-zh-cn.apk"
+
+          (
+            cd "${dist}"
+            sha256sum ./*.apk > SHA256SUMS
+          )
+
+          {
+            echo "ImmortalWrt: ${IMMORTALWRT_VERSION} ${IMMORTALWRT_REVISION}"
+            echo "Target: mediatek/filogic"
+            echo "Package architecture: ${PACKAGE_ARCH}"
+            echo "Source commit: ${GITHUB_SHA}"
+          } > "${dist}/BUILD-INFO.txt"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: luci-app-mihomo-mediatek-filogic-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish branch prerelease
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: luci-app-mihomo-mediatek-filogic-${{ github.sha }}
+          path: dist/
+
+      - name: Select branch release tag
+        id: release
+        shell: bash
+        run: |
+          safe_branch="$(printf '%s' "${GITHUB_REF_NAME}" | sed 's/[^A-Za-z0-9._-]/-/g')"
+          safe_branch="${safe_branch:0:80}"
+          test -n "${safe_branch}"
+          echo "tag=prerelease-${safe_branch}" >> "${GITHUB_OUTPUT}"
+          echo "name=luci-app-mihomo ${GITHUB_REF_NAME} (mediatek/filogic)" >> "${GITHUB_OUTPUT}"
+
+      - name: Move branch prerelease tag
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag --force "${RELEASE_TAG}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${RELEASE_TAG}" --force
+
+      - name: Publish latest successful branch build
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.name }}
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: dist/*
+          body: |
+            Automated APK build for ImmortalWrt 25.12.1 r37978-cd0a06bfd3fd,
+            target mediatek/filogic (aarch64_cortex-a53).
+
+            The release tag follows the latest successful commit on this branch.
+            These are standalone APK files rather than a signed package repository;
+            install them with `apk add --allow-untrusted`.

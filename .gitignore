@@ -1,0 +1,4 @@
+/src/luci-mihomo
+/src/.go-build/
+/src/.go-mod-cache/
+/.build/

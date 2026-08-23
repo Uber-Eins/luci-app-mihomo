@@ -1,0 +1,24 @@
+{
+	"luci-app-mihomo": {
+		"description": "View Mihomo status, history, and logs",
+		"read": {
+			"ubus": {
+				"session": [ "access" ]
+			}
+		}
+	},
+	"luci-app-mihomo-write": {
+		"description": "Change Mihomo configuration and service state",
+		"read": {
+			"ubus": {
+				"session": [ "access" ]
+			}
+		},
+		"write": {
+			"ubus": {
+				"session": [ "access" ]
+			}
+		}
+	}
+}
+

@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -eu
+
+inject=0
+if [ "${1##*/}" = "apk" ] && [ "${2:-}" = "mkpkg" ]; then
+	for argument in "$@"; do
+		if [ "$argument" = "name:luci-app-mihomo" ]; then
+			inject=1
+			break
+		fi
+	done
+fi
+
+if [ "$inject" -eq 1 ]; then
+	apk_binary=$1
+	apk_command=$2
+	shift 2
+	set -- "$apk_binary" "$apk_command" --info "replaces:mihomo" "$@"
+fi
+
+exec fakeroot "$@"

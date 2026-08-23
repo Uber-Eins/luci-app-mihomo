@@ -1,0 +1,8 @@
+#!/bin/sh
+
+/etc/init.d/luci-mihomo enable
+/etc/init.d/luci-mihomo start
+
+rm -f /tmp/luci-indexcache /tmp/luci-modulecache/*
+exit 0
+
