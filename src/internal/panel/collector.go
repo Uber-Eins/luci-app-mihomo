@@ -10,19 +10,17 @@ import (
 )
 
 type collectorState struct {
-	Connected     bool                 `json:"connected"`
-	LastError     string               `json:"lastError,omitempty"`
-	LastUpdate    time.Time            `json:"lastUpdate,omitempty"`
-	Version       string               `json:"version,omitempty"`
-	UploadSpeed   float64              `json:"uploadSpeed"`
-	DownloadSpeed float64              `json:"downloadSpeed"`
-	UploadTotal   uint64               `json:"uploadTotal"`
-	DownloadTotal uint64               `json:"downloadTotal"`
-	Memory        uint64               `json:"memory"`
-	Active        int                  `json:"active"`
-	Connections   []topologyConnection `json:"connections"`
-	Providers     []providerSummary    `json:"providers"`
-	Rules         []ruleSummary        `json:"rules"`
+	Connected     bool          `json:"connected"`
+	LastError     string        `json:"lastError,omitempty"`
+	LastUpdate    time.Time     `json:"lastUpdate,omitempty"`
+	Version       string        `json:"version,omitempty"`
+	UploadSpeed   float64       `json:"uploadSpeed"`
+	DownloadSpeed float64       `json:"downloadSpeed"`
+	UploadTotal   uint64        `json:"uploadTotal"`
+	DownloadTotal uint64        `json:"downloadTotal"`
+	Memory        uint64        `json:"memory"`
+	Active        int           `json:"active"`
+	Rules         []ruleSummary `json:"rules"`
 }
 
 type Collector struct {
@@ -67,8 +65,6 @@ func (collector *Collector) Snapshot() collectorState {
 	collector.mu.RLock()
 	defer collector.mu.RUnlock()
 	copy := collector.state
-	copy.Connections = append([]topologyConnection(nil), collector.state.Connections...)
-	copy.Providers = append([]providerSummary(nil), collector.state.Providers...)
 	copy.Rules = append([]ruleSummary(nil), collector.state.Rules...)
 	return copy
 }
@@ -98,12 +94,8 @@ func (collector *Collector) pollConnections(ctx context.Context) {
 	}
 	now := time.Now()
 	current := make(map[string]trackedConnection, len(snapshot.Connections))
-	topology := make([]topologyConnection, 0, min(len(snapshot.Connections), 200))
 	for _, connection := range snapshot.Connections {
 		current[connection.ID] = trackConnection(connection)
-		if len(topology) < 200 {
-			topology = append(topology, topologyFromConnection(connection))
-		}
 	}
 	for id, connection := range collector.previous {
 		if _, exists := current[id]; !exists {
@@ -132,7 +124,6 @@ func (collector *Collector) pollConnections(ctx context.Context) {
 	collector.state.UploadTotal = snapshot.UploadTotal
 	collector.state.DownloadTotal = snapshot.DownloadTotal
 	collector.state.Active = len(snapshot.Connections)
-	collector.state.Connections = topology
 	memory := collector.state.Memory
 	collector.mu.Unlock()
 	collector.stats.RecordSample(now, uploadSpeed, downloadSpeed, float64(memory), len(snapshot.Connections))
@@ -141,13 +132,10 @@ func (collector *Collector) pollConnections(ctx context.Context) {
 func (collector *Collector) metadataLoop(ctx context.Context) {
 	versionTicker := time.NewTicker(30 * time.Second)
 	rulesTicker := time.NewTicker(10 * time.Second)
-	providersTicker := time.NewTicker(60 * time.Second)
 	defer versionTicker.Stop()
 	defer rulesTicker.Stop()
-	defer providersTicker.Stop()
 	collector.pollVersion(ctx)
 	collector.pollRules(ctx)
-	collector.pollProviders(ctx)
 	for {
 		select {
 		case <-ctx.Done():
@@ -156,8 +144,6 @@ func (collector *Collector) metadataLoop(ctx context.Context) {
 			collector.pollVersion(ctx)
 		case <-rulesTicker.C:
 			collector.pollRules(ctx)
-		case <-providersTicker.C:
-			collector.pollProviders(ctx)
 		}
 	}
 }
@@ -188,31 +174,6 @@ func (collector *Collector) pollRules(ctx context.Context) {
 	}
 	collector.mu.Lock()
 	collector.state.Rules = rules
-	collector.mu.Unlock()
-}
-
-func (collector *Collector) pollProviders(ctx context.Context) {
-	var response providersResponse
-	if err := collector.client.getJSON(ctx, "/providers/proxies", &response); err != nil {
-		return
-	}
-	providers := make([]providerSummary, 0, len(response.Providers))
-	for mapName, provider := range response.Providers {
-		name := provider.Name
-		if name == "" {
-			name = mapName
-		}
-		alive := 0
-		for _, proxy := range provider.Proxies {
-			if proxy.Alive {
-				alive++
-			}
-		}
-		providers = append(providers, providerSummary{Name: name, Type: provider.Type, VehicleType: provider.VehicleType, UpdatedAt: provider.UpdatedAt, Total: len(provider.Proxies), Alive: alive, Used: provider.SubscriptionInfo.Upload + provider.SubscriptionInfo.Download, Limit: provider.SubscriptionInfo.Total, Expire: provider.SubscriptionInfo.Expire})
-	}
-	sort.Slice(providers, func(i, j int) bool { return providers[i].Name < providers[j].Name })
-	collector.mu.Lock()
-	collector.state.Providers = providers
 	collector.mu.Unlock()
 }
 

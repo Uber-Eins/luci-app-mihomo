@@ -348,14 +348,21 @@ func TestConfigurationAPIRollsBackWhenReloadHealthCheckFails(t *testing.T) {
 }
 
 func TestServiceAndPublicIPAPIsExposeOnlyUserActions(t *testing.T) {
-	var proxyCalled atomic.Bool
+	var ipipCalled atomic.Bool
+	var ipsbCalled atomic.Bool
 	proxy := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		proxyCalled.Store(true)
-		if request.URL.Host != "public-ip.invalid" {
-			t.Errorf("public IP request did not retain destination host: %s", request.URL.String())
-		}
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(response, `{"ip":"203.0.113.8"}`)
+		switch request.URL.Host {
+		case "ipip.invalid":
+			ipipCalled.Store(true)
+			_, _ = io.WriteString(response, `{"ret":"ok","data":{"ip":"203.0.113.8","location":["中国","福建","福州","电信"]}}`)
+		case "ipsb.invalid":
+			ipsbCalled.Store(true)
+			_, _ = io.WriteString(response, `{"ip":"2001:db8::8","country":"United States","organization":"Example Networks Inc"}`)
+		default:
+			t.Errorf("network information request did not retain destination host: %s", request.URL.String())
+			http.Error(response, "unexpected destination", http.StatusBadRequest)
+		}
 	}))
 	defer proxy.Close()
 	proxyURL, err := url.Parse(proxy.URL)
@@ -367,7 +374,8 @@ func TestServiceAndPublicIPAPIsExposeOnlyUserActions(t *testing.T) {
 		t.Fatalf("parse fake proxy port: %v", err)
 	}
 	fixture := newAPIFixture(t, func(opts *panel.Options, _ *fakeService) {
-		opts.PublicIPURL = "http://public-ip.invalid/json"
+		opts.IPIPURL = "http://ipip.invalid/json"
+		opts.IPSBURL = "http://ipsb.invalid/geoip"
 	})
 	_, configEnvelope := fixture.request(http.MethodPost, "/api/config/get", map[string]interface{}{})
 	configuration := dataObject(t, configEnvelope)
@@ -386,9 +394,14 @@ func TestServiceAndPublicIPAPIsExposeOnlyUserActions(t *testing.T) {
 		t.Fatalf("start action failed: status=%d body=%#v", status, startedEnvelope)
 	}
 	status, ipEnvelope := fixture.request(http.MethodPost, "/api/public-ip", map[string]interface{}{})
-	ip := dataObject(t, ipEnvelope)
-	if status != http.StatusOK || ip["address"] != "203.0.113.8" || !proxyCalled.Load() {
-		t.Fatalf("public IP API did not travel through the configured proxy: status=%d body=%#v called=%v", status, ipEnvelope, proxyCalled.Load())
+	information := dataObject(t, ipEnvelope)
+	ipip, ipipOK := information["ipip"].(map[string]interface{})
+	ipsb, ipsbOK := information["ipsb"].(map[string]interface{})
+	if status != http.StatusOK || !ipipOK || !ipsbOK ||
+		ipip["address"] != "203.0.113.8" || ipip["summary"] != "中国 福建 福州 电信" ||
+		ipsb["address"] != "2001:db8::8" || ipsb["summary"] != "United States Example Networks Inc" ||
+		!ipipCalled.Load() || !ipsbCalled.Load() {
+		t.Fatalf("network information API did not return both proxied sources: status=%d body=%#v ipip=%v ipsb=%v", status, ipEnvelope, ipipCalled.Load(), ipsbCalled.Load())
 	}
 }
 

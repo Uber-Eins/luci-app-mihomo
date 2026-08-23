@@ -10,7 +10,8 @@ import (
 
 const (
 	defaultControllerSocket = "/run/mihomo/mihomo.sock"
-	defaultPublicIPURL      = "https://api64.ipify.org?format=json"
+	defaultIPIPURL          = "https://myip.ipip.net/json"
+	defaultIPSBURL          = "https://api.ip.sb/geoip"
 	maxRequestBytes         = 4 << 20
 )
 
@@ -23,7 +24,7 @@ type Service interface {
 
 type ValidateFunc func(context.Context, string) error
 type HealthFunc func(context.Context) error
-type PublicIPFunc func(context.Context, string) (PublicIP, error)
+type PublicIPFunc func(context.Context, string) (NetworkInformation, error)
 
 type Options struct {
 	ConfigDir          string
@@ -36,7 +37,8 @@ type Options struct {
 	ControllerSocket   string
 	MihomoBinary       string
 	ServiceScript      string
-	PublicIPURL        string
+	IPIPURL            string
+	IPSBURL            string
 	Retention          time.Duration
 	ConnectionInterval time.Duration
 	HealthTimeout      time.Duration
@@ -60,7 +62,8 @@ func DefaultOptions() Options {
 		ControllerSocket:   defaultControllerSocket,
 		MihomoBinary:       "/usr/bin/mihomo",
 		ServiceScript:      "/etc/init.d/mihomo",
-		PublicIPURL:        defaultPublicIPURL,
+		IPIPURL:            defaultIPIPURL,
+		IPSBURL:            defaultIPSBURL,
 		Retention:          30 * 24 * time.Hour,
 		ConnectionInterval: 2 * time.Second,
 		HealthTimeout:      10 * time.Second,
@@ -99,9 +102,16 @@ type OverrideItem struct {
 	Content string `json:"content"`
 }
 
-type PublicIP struct {
-	Address string `json:"address"`
-	Family  string `json:"family"`
+type NetworkInformation struct {
+	IPIP NetworkInformationSource `json:"ipip"`
+	IPSB NetworkInformationSource `json:"ipsb"`
+}
+
+type NetworkInformationSource struct {
+	Address string `json:"address,omitempty"`
+	Family  string `json:"family,omitempty"`
+	Summary string `json:"summary,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 type LogEntry struct {

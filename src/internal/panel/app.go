@@ -63,8 +63,11 @@ func New(opts Options) (*App, error) {
 	if opts.ServiceScript == "" {
 		opts.ServiceScript = defaults.ServiceScript
 	}
-	if opts.PublicIPURL == "" {
-		opts.PublicIPURL = defaultPublicIPURL
+	if opts.IPIPURL == "" {
+		opts.IPIPURL = defaultIPIPURL
+	}
+	if opts.IPSBURL == "" {
+		opts.IPSBURL = defaultIPSBURL
 	}
 	if opts.Retention <= 0 || opts.Retention > 30*24*time.Hour {
 		opts.Retention = 30 * 24 * time.Hour
@@ -100,7 +103,7 @@ func New(opts Options) (*App, error) {
 		}
 	}
 	if opts.FetchPublicIP == nil {
-		opts.FetchPublicIP = defaultPublicIPFetcher(opts.PublicIPURL)
+		opts.FetchPublicIP = defaultPublicIPFetcher(opts.IPIPURL, opts.IPSBURL)
 	}
 	configs, err := newConfigManager(opts)
 	if err != nil {
@@ -374,11 +377,11 @@ func (app *App) publicIP(_ http.ResponseWriter, request *http.Request) (interfac
 	if err != nil {
 		return nil, err
 	}
-	address, err := app.opts.FetchPublicIP(request.Context(), configuration.Effective)
+	information, err := app.opts.FetchPublicIP(request.Context(), configuration.Effective)
 	if err != nil {
-		return nil, apiError(502, "public_ip_failed", "Could not determine the public IP through Mihomo", err.Error())
+		return nil, apiError(502, "network_information_failed", "Could not query network information through Mihomo", err.Error())
 	}
-	return address, nil
+	return information, nil
 }
 
 func (app *App) clearHistory(_ http.ResponseWriter, _ *http.Request) (interface{}, error) {

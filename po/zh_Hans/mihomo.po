@@ -99,6 +99,15 @@ msgstr "尚未请求"
 msgid "Check public IP"
 msgstr "查询公网 IP"
 
+msgid "Network information"
+msgstr "网络信息"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Query failed"
+msgstr "查询失败"
+
 msgid "Hide"
 msgstr "隐藏"
 

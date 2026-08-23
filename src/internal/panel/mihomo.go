@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -121,18 +122,6 @@ type connectionMetadata struct {
 	ProcessPath     string `json:"processPath"`
 }
 
-type topologyConnection struct {
-	ID          string   `json:"id"`
-	Source      string   `json:"source"`
-	Destination string   `json:"destination"`
-	Process     string   `json:"process"`
-	Network     string   `json:"network"`
-	Upload      uint64   `json:"upload"`
-	Download    uint64   `json:"download"`
-	Chains      []string `json:"chains"`
-	Rule        string   `json:"rule"`
-}
-
 type trackedConnection struct {
 	SourceIP    string
 	Destination string
@@ -142,36 +131,6 @@ type trackedConnection struct {
 	Rule        string
 	Upload      uint64
 	Download    uint64
-}
-
-type providerSummary struct {
-	Name        string    `json:"name"`
-	Type        string    `json:"type"`
-	VehicleType string    `json:"vehicleType"`
-	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
-	Total       int       `json:"total"`
-	Alive       int       `json:"alive"`
-	Used        uint64    `json:"used,omitempty"`
-	Limit       uint64    `json:"limit,omitempty"`
-	Expire      int64     `json:"expire,omitempty"`
-}
-
-type providersResponse struct {
-	Providers map[string]struct {
-		Name        string    `json:"name"`
-		Type        string    `json:"type"`
-		VehicleType string    `json:"vehicleType"`
-		UpdatedAt   time.Time `json:"updatedAt"`
-		Proxies     []struct {
-			Alive bool `json:"alive"`
-		} `json:"proxies"`
-		SubscriptionInfo struct {
-			Upload   uint64 `json:"Upload"`
-			Download uint64 `json:"Download"`
-			Total    uint64 `json:"Total"`
-			Expire   int64  `json:"Expire"`
-		} `json:"subscriptionInfo"`
-	} `json:"providers"`
 }
 
 type ruleSummary struct {
@@ -232,60 +191,116 @@ func (connection trackedConnection) dimensions() map[string]string {
 	}
 }
 
-func topologyFromConnection(connection mihomoConnection) topologyConnection {
-	source := net.JoinHostPort(connection.Metadata.SourceIP, connection.Metadata.SourcePort)
-	if connection.Metadata.SourceIP == "" {
-		source = "Unknown"
-	}
-	process := connection.Metadata.Process
-	if process == "" {
-		process = connection.Metadata.ProcessPath
-	}
-	rule := connection.Rule
-	if connection.Payload != "" {
-		rule += " / " + connection.Payload
-	}
-	return topologyConnection{ID: connection.ID, Source: source, Destination: destinationFor(connection), Process: process, Network: connection.Metadata.Network, Upload: connection.Upload, Download: connection.Download, Chains: append([]string(nil), connection.Chains...), Rule: rule}
-}
-
-func defaultPublicIPFetcher(endpoint string) PublicIPFunc {
-	return func(ctx context.Context, effectiveConfig string) (PublicIP, error) {
+func defaultPublicIPFetcher(ipipEndpoint, ipsbEndpoint string) PublicIPFunc {
+	return func(ctx context.Context, effectiveConfig string) (NetworkInformation, error) {
 		port, err := proxyPortFromYAML(effectiveConfig)
 		if err != nil {
-			return PublicIP{}, err
+			return NetworkInformation{}, err
 		}
 		proxy, _ := url.Parse("http://127.0.0.1:" + strconv.Itoa(port))
+		transport := &http.Transport{
+			Proxy:               http.ProxyURL(proxy),
+			DialContext:         (&net.Dialer{Timeout: 4 * time.Second}).DialContext,
+			TLSHandshakeTimeout: 4 * time.Second,
+			DisableKeepAlives:   true,
+		}
+		defer transport.CloseIdleConnections()
 		client := &http.Client{
-			Transport: &http.Transport{Proxy: http.ProxyURL(proxy), DialContext: (&net.Dialer{Timeout: 4 * time.Second}).DialContext, TLSHandshakeTimeout: 4 * time.Second, DisableKeepAlives: true},
-			Timeout:   8 * time.Second,
+			Transport: transport,
+			Timeout:   10 * time.Second,
 		}
-		request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			return PublicIP{}, err
-		}
-		request.Header.Set("Accept", "application/json")
-		response, err := client.Do(request)
-		if err != nil {
-			return PublicIP{}, fmt.Errorf("request through Mihomo proxy: %w", err)
-		}
-		defer response.Body.Close()
-		if response.StatusCode != http.StatusOK {
-			return PublicIP{}, fmt.Errorf("public IP service returned %s", response.Status)
-		}
-		var payload struct {
-			IP string `json:"ip"`
-		}
-		if err := json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&payload); err != nil {
-			return PublicIP{}, err
-		}
-		address := net.ParseIP(strings.TrimSpace(payload.IP))
-		if address == nil {
-			return PublicIP{}, fmt.Errorf("public IP service returned an invalid address")
-		}
-		family := "IPv6"
-		if address.To4() != nil {
-			family = "IPv4"
-		}
-		return PublicIP{Address: address.String(), Family: family}, nil
+		var information NetworkInformation
+		var wait sync.WaitGroup
+		wait.Add(2)
+		go func() {
+			defer wait.Done()
+			information.IPIP = fetchIPIP(ctx, client, ipipEndpoint)
+		}()
+		go func() {
+			defer wait.Done()
+			information.IPSB = fetchIPSB(ctx, client, ipsbEndpoint)
+		}()
+		wait.Wait()
+		return information, nil
 	}
+}
+
+func fetchIPIP(ctx context.Context, client *http.Client, endpoint string) NetworkInformationSource {
+	var payload struct {
+		Ret  string `json:"ret"`
+		Data struct {
+			IP       string   `json:"ip"`
+			Location []string `json:"location"`
+		} `json:"data"`
+	}
+	if err := fetchPublicIPJSON(ctx, client, endpoint, &payload); err != nil {
+		return NetworkInformationSource{Error: err.Error()}
+	}
+	if payload.Ret != "" && payload.Ret != "ok" {
+		return NetworkInformationSource{Error: "ipip.net returned an unsuccessful response"}
+	}
+	location := make([]string, 0, len(payload.Data.Location))
+	for _, part := range payload.Data.Location {
+		if part = strings.TrimSpace(part); part != "" {
+			location = append(location, part)
+		}
+	}
+	return publicIPSource(payload.Data.IP, strings.Join(location, " "))
+}
+
+func fetchIPSB(ctx context.Context, client *http.Client, endpoint string) NetworkInformationSource {
+	var payload struct {
+		IP              string `json:"ip"`
+		Country         string `json:"country"`
+		Organization    string `json:"organization"`
+		ASNOrganization string `json:"asn_organization"`
+		ISP             string `json:"isp"`
+	}
+	if err := fetchPublicIPJSON(ctx, client, endpoint, &payload); err != nil {
+		return NetworkInformationSource{Error: err.Error()}
+	}
+	organization := firstNonempty(payload.Organization, payload.ASNOrganization, payload.ISP)
+	summary := strings.TrimSpace(strings.TrimSpace(payload.Country) + " " + organization)
+	return publicIPSource(payload.IP, summary)
+}
+
+func fetchPublicIPJSON(ctx context.Context, client *http.Client, endpoint string, target interface{}) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Accept", "application/json")
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("request through Mihomo proxy: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("network information service returned %s", response.Status)
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 64<<10)).Decode(target); err != nil {
+		return fmt.Errorf("decode network information: %w", err)
+	}
+	return nil
+}
+
+func publicIPSource(value, summary string) NetworkInformationSource {
+	address := net.ParseIP(strings.TrimSpace(value))
+	if address == nil {
+		return NetworkInformationSource{Error: "network information service returned an invalid address"}
+	}
+	family := "IPv6"
+	if address.To4() != nil {
+		family = "IPv4"
+	}
+	return NetworkInformationSource{Address: address.String(), Family: family, Summary: strings.TrimSpace(summary)}
+}
+
+func firstNonempty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }

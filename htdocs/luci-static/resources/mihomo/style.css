@@ -103,15 +103,57 @@
 
 .mihomo-chart {
 	width: 100%;
-	height: 230px;
+	height: 260px;
 	display: block;
 }
 
-.mihomo-topology {
-	width: 100%;
-	height: 310px;
-	border-radius: .45rem;
-	background: rgba(127, 127, 127, .035);
+.mihomo-chart-legend {
+	color: var(--mihomo-muted);
+	font-size: .78rem;
+}
+
+.mihomo-chart-key::before {
+	content: '';
+	display: inline-block;
+	width: .5rem;
+	height: .5rem;
+	margin-right: .3rem;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.mihomo-chart-key.download { color: #3b82f6; }
+.mihomo-chart-key.upload { color: #a855f7; }
+
+.mihomo-network-sources {
+	display: grid;
+	gap: .9rem;
+}
+
+.mihomo-network-source + .mihomo-network-source {
+	padding-top: .9rem;
+	border-top: 1px solid var(--mihomo-border);
+}
+
+.mihomo-network-label {
+	margin-bottom: .25rem;
+	color: var(--mihomo-muted);
+	font-size: .78rem;
+}
+
+.mihomo-network-value,
+.mihomo-network-address {
+	display: inline;
+	font-size: .92rem;
+}
+
+.mihomo-network-value.error {
+	color: var(--mihomo-bad);
+}
+
+.mihomo-network-address {
+	color: var(--mihomo-muted);
+	font-variant-numeric: tabular-nums;
 }
 
 .mihomo-table-wrap {
@@ -240,12 +282,6 @@
 	overflow: auto;
 }
 
-.mihomo-ip {
-	font-size: 1.05rem;
-	font-weight: 650;
-	font-variant-numeric: tabular-nums;
-}
-
 .mihomo-empty {
 	padding: 2rem 1rem;
 	text-align: center;
@@ -271,4 +307,3 @@
 @media (prefers-reduced-motion: reduce) {
 	.mihomo-page * { scroll-behavior: auto !important; }
 }
-

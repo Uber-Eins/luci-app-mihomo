@@ -84,6 +84,15 @@ msgstr ""
 msgid "Check public IP"
 msgstr ""
 
+msgid "Network information"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Query failed"
+msgstr ""
+
 msgid "Clear history"
 msgstr ""
 
