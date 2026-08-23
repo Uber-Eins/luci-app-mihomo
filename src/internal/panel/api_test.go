@@ -405,7 +405,7 @@ func TestServiceAndPublicIPAPIsExposeOnlyUserActions(t *testing.T) {
 	}
 }
 
-func TestOverviewAndLogsAPIPersistCollectedUserHistoryAcrossRestart(t *testing.T) {
+func TestOverviewRealtimeRulesAndLogsAPIsPersistUserHistoryAcrossRestart(t *testing.T) {
 	directory := t.TempDir()
 	socketPath := filepath.Join(directory, "mihomo.sock")
 	listener, err := net.Listen("unix", socketPath)
@@ -433,9 +433,11 @@ func TestOverviewAndLogsAPIPersistCollectedUserHistoryAcrossRestart(t *testing.T
 		case "/version":
 			_, _ = io.WriteString(response, `{"version":"test-mihomo"}`)
 		case "/rules":
-			_, _ = io.WriteString(response, `{"rules":[]}`)
+			_, _ = io.WriteString(response, `{"rules":[{"type":"RuleSet","payload":"REJECT-domain","proxy":"REJECT","extra":{"hitCount":9428}}]}`)
 		case "/providers/proxies":
 			_, _ = io.WriteString(response, `{"providers":{}}`)
+		case "/traffic":
+			_, _ = io.WriteString(response, `{"up":1024,"down":2048,"upTotal":51200,"downTotal":102400}`+"\n")
 		case "/memory":
 			_, _ = io.WriteString(response, `{"inuse":1048576}`+"\n")
 		case "/logs":
@@ -488,21 +490,47 @@ func TestOverviewAndLogsAPIPersistCollectedUserHistoryAcrossRestart(t *testing.T
 		_, logsEnvelope := fixture.request(http.MethodGet, "/api/logs?cursor=0&limit=50&q=user-visible", nil)
 		logs := dataObject(t, logsEnvelope)
 		entries, _ := logs["entries"].([]interface{})
-		if len(aggregates) > 0 && len(entries) > 0 {
+		_, realtimeEnvelope := fixture.request(http.MethodGet, "/api/realtime", nil)
+		realtime := dataObject(t, realtimeEnvelope)
+		_, rulesEnvelope := fixture.request(http.MethodGet, "/api/rules?limit=40", nil)
+		rules, _ := dataObject(t, rulesEnvelope)["rules"].([]interface{})
+		if len(aggregates) > 0 && len(entries) > 0 && len(rules) > 0 && realtime["downloadSpeed"] == float64(2048) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("collector data did not become visible: history=%#v logs=%#v", history, logs)
+			t.Fatalf("collector data did not become visible: history=%#v logs=%#v realtime=%#v rules=%#v", history, logs, realtime, rules)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	_, overviewEnvelope := fixture.request(http.MethodGet, "/api/overview?range=1h&history=0", nil)
+	_, overviewEnvelope := fixture.request(http.MethodGet, "/api/overview", nil)
 	overview := dataObject(t, overviewEnvelope)
 	if overview["serviceRunning"] != true {
 		t.Fatalf("overview did not expose running state: %#v", overview)
 	}
-	if _, included := overview["history"]; included {
-		t.Fatalf("lightweight live overview refresh unexpectedly included history: %#v", overview)
+	current, currentOK := overview["current"].(map[string]interface{})
+	if !currentOK {
+		t.Fatalf("overview did not expose controller state: %#v", overview)
+	}
+	for _, heavyField := range []string{"connections", "providers", "rules"} {
+		if _, included := current[heavyField]; included {
+			t.Fatalf("lightweight overview unexpectedly included %s: %#v", heavyField, overview)
+		}
+	}
+	_, realtimeEnvelope := fixture.request(http.MethodGet, "/api/realtime", nil)
+	realtime := dataObject(t, realtimeEnvelope)
+	if realtime["downloadSpeed"] != float64(2048) || realtime["uploadSpeed"] != float64(1024) ||
+		realtime["downloadTotal"] != float64(102400) || realtime["uploadTotal"] != float64(51200) {
+		t.Fatalf("real-time API did not expose the compact traffic stream: %#v", realtime)
+	}
+	for _, heavyField := range []string{"connections", "providers", "rules"} {
+		if _, included := realtime[heavyField]; included {
+			t.Fatalf("real-time API unexpectedly included %s: %#v", heavyField, realtime)
+		}
+	}
+	_, rulesEnvelope := fixture.request(http.MethodGet, "/api/rules?limit=40", nil)
+	rules, _ := dataObject(t, rulesEnvelope)["rules"].([]interface{})
+	if len(rules) != 1 || !strings.Contains(fmt.Sprint(rules[0]), "REJECT-domain") || !strings.Contains(fmt.Sprint(rules[0]), "9428") {
+		t.Fatalf("rule hit API did not expose chart data: %#v", rules)
 	}
 
 	server.Close()

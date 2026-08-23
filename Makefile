@@ -65,6 +65,8 @@ define Package/luci-app-mihomo/postinst
 [ -n "$${IPKG_INSTROOT}" ] || {
 	rm -rf /tmp/luci-modulecache/
 	/etc/init.d/rpcd reload 2>/dev/null
+	/etc/init.d/luci-mihomo enable 2>/dev/null
+	/etc/init.d/luci-mihomo restart 2>/dev/null || /etc/init.d/luci-mihomo start
 }
 exit 0
 endef

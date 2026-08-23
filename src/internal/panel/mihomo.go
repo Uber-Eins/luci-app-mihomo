@@ -93,9 +93,7 @@ func (client *mihomoClient) streamJSON(ctx context.Context, path string, consume
 }
 
 type connectionSnapshot struct {
-	DownloadTotal uint64             `json:"downloadTotal"`
-	UploadTotal   uint64             `json:"uploadTotal"`
-	Connections   []mihomoConnection `json:"connections"`
+	Connections []mihomoConnection `json:"connections"`
 }
 
 type mihomoConnection struct {

@@ -23,6 +23,25 @@ type collectorState struct {
 	Rules         []ruleSummary `json:"rules"`
 }
 
+type overviewState struct {
+	Connected  bool      `json:"connected"`
+	LastError  string    `json:"lastError,omitempty"`
+	LastUpdate time.Time `json:"lastUpdate,omitempty"`
+	Version    string    `json:"version,omitempty"`
+}
+
+type realtimeState struct {
+	Timestamp     int64   `json:"timestamp"`
+	Connected     bool    `json:"connected"`
+	LastError     string  `json:"lastError,omitempty"`
+	UploadSpeed   float64 `json:"uploadSpeed"`
+	DownloadSpeed float64 `json:"downloadSpeed"`
+	UploadTotal   uint64  `json:"uploadTotal"`
+	DownloadTotal uint64  `json:"downloadTotal"`
+	Memory        uint64  `json:"memory"`
+	Active        int     `json:"active"`
+}
+
 type Collector struct {
 	client *mihomoClient
 	stats  *StatsStore
@@ -32,9 +51,6 @@ type Collector struct {
 	mu                 sync.RWMutex
 	state              collectorState
 	previous           map[string]trackedConnection
-	lastPoll           time.Time
-	lastUp             uint64
-	lastDown           uint64
 	wg                 sync.WaitGroup
 	connectionInterval time.Duration
 }
@@ -44,6 +60,7 @@ func newCollector(client *mihomoClient, stats *StatsStore, logs *logRing, logger
 }
 
 func (collector *Collector) Start(ctx context.Context) {
+	collector.run(ctx, collector.trafficLoop)
 	collector.run(ctx, collector.connectionLoop)
 	collector.run(ctx, collector.metadataLoop)
 	collector.run(ctx, collector.memoryLoop)
@@ -61,12 +78,88 @@ func (collector *Collector) run(ctx context.Context, loop func(context.Context))
 
 func (collector *Collector) Wait() { collector.wg.Wait() }
 
-func (collector *Collector) Snapshot() collectorState {
+func (collector *Collector) Overview() overviewState {
 	collector.mu.RLock()
 	defer collector.mu.RUnlock()
-	copy := collector.state
-	copy.Rules = append([]ruleSummary(nil), collector.state.Rules...)
-	return copy
+	return overviewState{
+		Connected: collector.state.Connected, LastError: collector.state.LastError,
+		LastUpdate: collector.state.LastUpdate, Version: collector.state.Version,
+	}
+}
+
+func (collector *Collector) Realtime() realtimeState {
+	collector.mu.RLock()
+	defer collector.mu.RUnlock()
+	timestamp := collector.state.LastUpdate.Unix()
+	if collector.state.LastUpdate.IsZero() {
+		timestamp = time.Now().Unix()
+	}
+	return realtimeState{
+		Timestamp: timestamp, Connected: collector.state.Connected, LastError: collector.state.LastError,
+		UploadSpeed: collector.state.UploadSpeed, DownloadSpeed: collector.state.DownloadSpeed,
+		UploadTotal: collector.state.UploadTotal, DownloadTotal: collector.state.DownloadTotal,
+		Memory: collector.state.Memory, Active: collector.state.Active,
+	}
+}
+
+func (collector *Collector) Rules(limit int) []ruleSummary {
+	collector.mu.RLock()
+	defer collector.mu.RUnlock()
+	if limit < 1 || limit > len(collector.state.Rules) {
+		limit = len(collector.state.Rules)
+	}
+	return append([]ruleSummary(nil), collector.state.Rules[:limit]...)
+}
+
+func (collector *Collector) trafficLoop(ctx context.Context) {
+	backoff := time.Second
+	reportedFailure := false
+	for ctx.Err() == nil {
+		received := false
+		err := collector.client.streamJSON(ctx, "/traffic", func(raw json.RawMessage) {
+			var payload struct {
+				Up        uint64 `json:"up"`
+				Down      uint64 `json:"down"`
+				UpTotal   uint64 `json:"upTotal"`
+				DownTotal uint64 `json:"downTotal"`
+			}
+			if json.Unmarshal(raw, &payload) != nil {
+				return
+			}
+			received = true
+			now := time.Now()
+			collector.mu.Lock()
+			collector.state.Connected = true
+			collector.state.LastError = ""
+			collector.state.LastUpdate = now
+			collector.state.UploadSpeed = float64(payload.Up)
+			collector.state.DownloadSpeed = float64(payload.Down)
+			collector.state.UploadTotal = payload.UpTotal
+			collector.state.DownloadTotal = payload.DownTotal
+			memory := collector.state.Memory
+			active := collector.state.Active
+			collector.mu.Unlock()
+			collector.stats.RecordSample(now, float64(payload.Up), float64(payload.Down), float64(memory), active)
+		})
+		if ctx.Err() != nil {
+			return
+		}
+		if received {
+			reportedFailure = false
+		}
+		if err != nil && !reportedFailure {
+			collector.logger.Printf("traffic stream: %v", err)
+			reportedFailure = true
+		}
+		if !waitBackoff(ctx, backoff) {
+			return
+		}
+		if received {
+			backoff = time.Second
+		} else {
+			backoff = min(backoff*2, 30*time.Second)
+		}
+	}
 }
 
 func (collector *Collector) connectionLoop(ctx context.Context) {
@@ -102,31 +195,14 @@ func (collector *Collector) pollConnections(ctx context.Context) {
 			collector.stats.RecordClosed(now, connection.dimensions(), connection.Upload, connection.Download)
 		}
 	}
-	uploadSpeed, downloadSpeed := float64(0), float64(0)
-	if !collector.lastPoll.IsZero() {
-		elapsed := now.Sub(collector.lastPoll).Seconds()
-		if elapsed > 0 && snapshot.UploadTotal >= collector.lastUp && snapshot.DownloadTotal >= collector.lastDown {
-			uploadSpeed = float64(snapshot.UploadTotal-collector.lastUp) / elapsed
-			downloadSpeed = float64(snapshot.DownloadTotal-collector.lastDown) / elapsed
-		}
-	}
 	collector.previous = current
-	collector.lastPoll = now
-	collector.lastUp = snapshot.UploadTotal
-	collector.lastDown = snapshot.DownloadTotal
 
 	collector.mu.Lock()
 	collector.state.Connected = true
 	collector.state.LastError = ""
 	collector.state.LastUpdate = now
-	collector.state.UploadSpeed = uploadSpeed
-	collector.state.DownloadSpeed = downloadSpeed
-	collector.state.UploadTotal = snapshot.UploadTotal
-	collector.state.DownloadTotal = snapshot.DownloadTotal
 	collector.state.Active = len(snapshot.Connections)
-	memory := collector.state.Memory
 	collector.mu.Unlock()
-	collector.stats.RecordSample(now, uploadSpeed, downloadSpeed, float64(memory), len(snapshot.Connections))
 }
 
 func (collector *Collector) metadataLoop(ctx context.Context) {

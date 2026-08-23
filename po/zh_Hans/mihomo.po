@@ -75,6 +75,24 @@ msgstr "已上传"
 msgid "Traffic history"
 msgstr "流量历史"
 
+msgid "Real-time traffic"
+msgstr "实时流量"
+
+msgid "Last 60 seconds · refreshed every second"
+msgstr "最近 60 秒 · 每秒刷新"
+
+msgid "Download"
+msgstr "下载"
+
+msgid "Upload"
+msgstr "上传"
+
+msgid "Real-time traffic chart"
+msgstr "实时流量图"
+
+msgid "Waiting for real-time traffic"
+msgstr "正在等待实时流量"
+
 msgid "Last hour"
 msgstr "最近 1 小时"
 
@@ -107,6 +125,15 @@ msgstr "刷新"
 
 msgid "Query failed"
 msgstr "查询失败"
+
+msgid "Network information request timed out"
+msgstr "网络信息请求超时"
+
+msgid "The running Mihomo manager is incompatible; restart it and try again."
+msgstr "当前运行的 Mihomo 管理器版本不兼容；请重启后重试。"
+
+msgid "Unknown"
+msgstr "未知"
 
 msgid "Hide"
 msgstr "隐藏"
@@ -146,6 +173,21 @@ msgstr "代理提供者"
 
 msgid "Rule hits"
 msgstr "规则命中"
+
+msgid "Hover over a bar to inspect the rule."
+msgstr "将鼠标悬停在柱形上查看规则详情。"
+
+msgid "Rule hit chart"
+msgstr "规则命中图"
+
+msgid "No rule hits yet"
+msgstr "暂无规则命中"
+
+msgid "Proxy"
+msgstr "代理"
+
+msgid "Hits"
+msgstr "命中次数"
 
 msgid "Statistics storage"
 msgstr "统计存储"

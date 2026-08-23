@@ -15,6 +15,8 @@ const READ_ENDPOINTS = {
 	'health': '/api/health',
 	'status': '/api/status',
 	'overview': '/api/overview',
+	'realtime': '/api/realtime',
+	'rules': '/api/rules',
 	'history': '/api/history',
 	'logs': '/api/logs'
 };

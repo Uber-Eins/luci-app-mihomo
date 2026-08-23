@@ -59,7 +59,7 @@
 
 .mihomo-card.wide { grid-column: span 8; }
 .mihomo-card.full { grid-column: 1 / -1; }
-.mihomo-card.metric { grid-column: span 2; }
+.mihomo-card.metric { grid-column: span 3; }
 
 .mihomo-card-head {
 	justify-content: space-between;
@@ -103,9 +103,40 @@
 
 .mihomo-chart {
 	width: 100%;
-	height: 260px;
+	height: 300px;
 	display: block;
 }
+
+.mihomo-realtime-head {
+	align-items: flex-end;
+}
+
+.mihomo-realtime-values {
+	display: flex;
+	align-items: flex-end;
+	justify-content: flex-end;
+	gap: 1.35rem;
+	flex-wrap: wrap;
+}
+
+.mihomo-live-speed {
+	display: grid;
+	gap: .12rem;
+	min-width: 8.5rem;
+}
+
+.mihomo-live-label {
+	font-size: .75rem;
+	color: var(--mihomo-muted);
+}
+
+.mihomo-live-speed strong {
+	font-size: clamp(1.05rem, 1.8vw, 1.45rem);
+	font-variant-numeric: tabular-nums;
+}
+
+.mihomo-live-speed.download strong { color: #3b82f6; }
+.mihomo-live-speed.upload strong { color: #a855f7; }
 
 .mihomo-chart-legend {
 	color: var(--mihomo-muted);
@@ -154,6 +185,42 @@
 .mihomo-network-address {
 	color: var(--mihomo-muted);
 	font-variant-numeric: tabular-nums;
+}
+
+.mihomo-rule-chart-wrap {
+	position: relative;
+	min-width: 0;
+}
+
+.mihomo-rule-chart {
+	display: block;
+	width: 100%;
+	height: 340px;
+}
+
+.mihomo-chart-tooltip {
+	position: absolute;
+	z-index: 3;
+	display: grid;
+	gap: .28rem;
+	max-width: min(24rem, calc(100% - 12px));
+	padding: .65rem .75rem;
+	box-sizing: border-box;
+	border: 1px solid var(--mihomo-border);
+	border-radius: .5rem;
+	background: var(--background-color-high, #111827);
+	box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .22);
+	font-size: .78rem;
+	pointer-events: none;
+	word-break: break-word;
+}
+
+.mihomo-chart-tooltip[hidden] {
+	display: none;
+}
+
+.mihomo-chart-tooltip strong {
+	font-size: .82rem;
 }
 
 .mihomo-table-wrap {
@@ -289,7 +356,7 @@
 }
 
 @media (max-width: 1100px) {
-	.mihomo-card.metric { grid-column: span 4; }
+	.mihomo-card.metric { grid-column: span 6; }
 	.mihomo-card,
 	.mihomo-card.wide { grid-column: span 6; }
 }
@@ -302,6 +369,8 @@
 	.mihomo-card.full { grid-column: 1; }
 	.mihomo-editor { min-height: 55vh; }
 	.mihomo-head { align-items: flex-start; }
+	.mihomo-realtime-values { justify-content: flex-start; }
+	.mihomo-live-speed { min-width: 7rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

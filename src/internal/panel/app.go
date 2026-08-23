@@ -147,6 +147,8 @@ func (app *App) Handler() http.Handler {
 	mux.HandleFunc("/api/health", app.handle(http.MethodGet, app.health))
 	mux.HandleFunc("/api/status", app.handle(http.MethodGet, app.status))
 	mux.HandleFunc("/api/overview", app.handle(http.MethodGet, app.overview))
+	mux.HandleFunc("/api/realtime", app.handle(http.MethodGet, app.realtime))
+	mux.HandleFunc("/api/rules", app.handle(http.MethodGet, app.rules))
 	mux.HandleFunc("/api/history", app.handle(http.MethodGet, app.history))
 	mux.HandleFunc("/api/logs", app.handle(http.MethodGet, app.queryLogs))
 	mux.HandleFunc("/api/config/get", app.handle(http.MethodPost, app.getConfig))
@@ -243,7 +245,7 @@ func (app *App) status(_ http.ResponseWriter, request *http.Request) (interface{
 	if err != nil {
 		return nil, apiError(502, "service_state_failed", "Could not determine Mihomo service state", err.Error())
 	}
-	state := app.collector.Snapshot()
+	state := app.collector.Overview()
 	return map[string]interface{}{
 		"running": running, "controllerConnected": state.Connected, "controllerSocket": defaultControllerSocket,
 		"version": state.Version, "lastError": state.LastError, "lastUpdate": state.LastUpdate,
@@ -251,23 +253,28 @@ func (app *App) status(_ http.ResponseWriter, request *http.Request) (interface{
 }
 
 func (app *App) overview(_ http.ResponseWriter, request *http.Request) (interface{}, error) {
-	since, resolution, err := historyRange(request.URL.Query().Get("range"))
+	running, err := app.service.Running(request.Context())
 	if err != nil {
-		return nil, err
+		return nil, apiError(502, "service_state_failed", "Could not determine Mihomo service state", err.Error())
 	}
-	running, serviceErr := app.service.Running(request.Context())
-	if serviceErr != nil {
-		return nil, apiError(502, "service_state_failed", "Could not determine Mihomo service state", serviceErr.Error())
+	return map[string]interface{}{
+		"schemaVersion": 2, "serviceRunning": running, "current": app.collector.Overview(),
+	}, nil
+}
+
+func (app *App) realtime(_ http.ResponseWriter, _ *http.Request) (interface{}, error) {
+	return app.collector.Realtime(), nil
+}
+
+func (app *App) rules(_ http.ResponseWriter, request *http.Request) (interface{}, error) {
+	limit, err := strconv.Atoi(request.URL.Query().Get("limit"))
+	if err != nil && request.URL.Query().Get("limit") != "" {
+		return nil, apiError(400, "invalid_limit", "Rule limit must be an integer", nil)
 	}
-	result := map[string]interface{}{"serviceRunning": running, "current": app.collector.Snapshot(), "resolutionSeconds": int64(resolution.Seconds())}
-	if request.URL.Query().Get("history") != "0" {
-		points, err := app.stats.History(since)
-		if err != nil {
-			return nil, err
-		}
-		result["history"] = downsample(points, resolution)
+	if limit < 1 || limit > 100 {
+		limit = 40
 	}
-	return result, nil
+	return map[string]interface{}{"rules": app.collector.Rules(limit)}, nil
 }
 
 func (app *App) history(_ http.ResponseWriter, request *http.Request) (interface{}, error) {

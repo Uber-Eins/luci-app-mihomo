@@ -63,6 +63,24 @@ msgstr ""
 msgid "Traffic history"
 msgstr ""
 
+msgid "Real-time traffic"
+msgstr ""
+
+msgid "Last 60 seconds · refreshed every second"
+msgstr ""
+
+msgid "Download"
+msgstr ""
+
+msgid "Upload"
+msgstr ""
+
+msgid "Real-time traffic chart"
+msgstr ""
+
+msgid "Waiting for real-time traffic"
+msgstr ""
+
 msgid "Live topology"
 msgstr ""
 
@@ -73,6 +91,21 @@ msgid "Proxy providers"
 msgstr ""
 
 msgid "Rule hits"
+msgstr ""
+
+msgid "Hover over a bar to inspect the rule."
+msgstr ""
+
+msgid "Rule hit chart"
+msgstr ""
+
+msgid "No rule hits yet"
+msgstr ""
+
+msgid "Proxy"
+msgstr ""
+
+msgid "Hits"
 msgstr ""
 
 msgid "Active connections"
@@ -91,6 +124,15 @@ msgid "Refresh"
 msgstr ""
 
 msgid "Query failed"
+msgstr ""
+
+msgid "Network information request timed out"
+msgstr ""
+
+msgid "The running Mihomo manager is incompatible; restart it and try again."
+msgstr ""
+
+msgid "Unknown"
 msgstr ""
 
 msgid "Clear history"
