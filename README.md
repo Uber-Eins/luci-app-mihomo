@@ -19,7 +19,7 @@ The browser edits `/etc/mihomo/config.base.yaml`. Enabled overrides are merged f
 external-controller-unix: /run/mihomo/mihomo.sock
 ```
 
-On first start, an existing `config.yaml` is adopted as the source and safely reconciled to enable the fixed Unix socket. Mihomo does not validate `secret` for Unix-socket API requests, so the panel deliberately sends no bearer credential. Mihomo creates the socket itself with mode `0666`; the panel therefore creates and reasserts the real security boundary, the root-owned `/run/mihomo` directory, with mode `0700` at panel startup and before it starts or reloads Mihomo. The panel's own manager socket is created with mode `0600`.
+On first start, an existing `config.yaml` is adopted as the source and safely reconciled to enable the fixed Unix socket. Mihomo does not validate `secret` for Unix-socket API requests, so the panel deliberately sends no bearer credential. Mihomo creates the socket itself with mode `0666`; the panel therefore creates and reasserts the real security boundary, the root-owned `/run/mihomo` directory, with mode `0700` at panel startup and before it starts or reloads Mihomo. The controller socket and the panel's mode-`0600` manager socket share that runtime directory as `/run/mihomo/mihomo.sock` and `/run/mihomo/manager.sock`.
 
 An apply operation stages `/tmp/mihomo-config.yaml.new`, invokes `mihomo -t -d /etc/mihomo -f /tmp/mihomo-config.yaml.new`, performs same-filesystem atomic renames, and reloads Mihomo only when it was already running. If the Unix controller does not become healthy, the old files are restored and the old service is restarted. A stopped service remains stopped.
 
@@ -27,15 +27,13 @@ Overrides implement recursive map merging, ordinary replacement for scalars and 
 
 Statistics are stored in `/etc/mihomo/statistics.db`, flushed periodically, and pruned after 30 days. The collector and LuCI bridge expose no general-purpose file or command execution API.
 
-The panel APK directly owns `/etc/init.d/mihomo` and declares that path as a
-replacement for the core `mihomo` package's copy. Before a live first install,
-the panel saves the existing core init script under `/etc/mihomo`; removing the
-panel atomically restores that script and its previous enabled/running state.
-While the panel is installed, core-package upgrades leave the panel-owned init
-script in place. The managed service sets procd `stdout` and `stderr` forwarding
-to false, because the panel already consumes Mihomo's `/logs` stream over the
-protected Unix controller and keeps it in a bounded in-memory ring. Manager
-diagnostics still go to the system log; high-volume Mihomo runtime logs do not.
+The panel APK directly provides `/etc/init.d/mihomo`; the core package keeps its
+optional init-script template outside `/etc/init.d`, so service takeover and
+restore hooks are unnecessary. The panel-provided service sets procd `stdout`
+and `stderr` forwarding to false, because the panel already consumes Mihomo's
+`/logs` stream over the protected Unix controller and keeps it in a bounded
+in-memory ring. Manager diagnostics still go to the system log; high-volume
+Mihomo runtime logs do not.
 
 ## Build
 

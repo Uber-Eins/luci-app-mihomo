@@ -3,7 +3,7 @@
 
 import * as socket from 'socket';
 
-const MANAGER_SOCKET = '/run/luci-mihomo/manager.sock';
+const MANAGER_SOCKET = '/run/mihomo/manager.sock';
 const MAX_RESPONSE = 20 * 1024 * 1024;
 const STATUS_TEXT = {
 	'200': 'OK', '400': 'Bad Request', '404': 'Not Found', '405': 'Method Not Allowed',

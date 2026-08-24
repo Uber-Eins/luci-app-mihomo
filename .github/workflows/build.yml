@@ -106,8 +106,6 @@ jobs:
 
           metadata="$(staging_dir/host/bin/apk adbdump "${app_packages[0]}")"
           grep --quiet 'arch: aarch64_cortex-a53' <<< "${metadata}"
-          grep --quiet '^  replaces:' <<< "${metadata}"
-          grep --quiet '^    - mihomo$' <<< "${metadata}"
           staging_dir/host/bin/apk verify --allow-untrusted "${app_packages[0]}"
           staging_dir/host/bin/apk verify --allow-untrusted "${i18n_packages[0]}"
 
@@ -117,7 +115,6 @@ jobs:
             --destination "${extracted}" "${app_packages[0]}"
           test -x "${extracted}/etc/init.d/luci-mihomo"
           test -x "${extracted}/etc/init.d/mihomo"
-          test -x "${extracted}/usr/share/luci-mihomo/mihomo.init.core"
           grep --quiet '^# Managed by luci-app-mihomo\.$' \
             "${extracted}/etc/init.d/mihomo"
           grep --quiet '^[[:space:]]*procd_set_param stdout 0$' \

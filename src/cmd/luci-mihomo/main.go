@@ -22,7 +22,7 @@ var version = "dev"
 func main() {
 	var (
 		showVersion = flag.Bool("version", false, "print version and exit")
-		runtimeDir  = flag.String("runtime-dir", "/run/luci-mihomo", "runtime directory")
+		runtimeDir  = flag.String("runtime-dir", "/run/mihomo", "runtime directory")
 		configDir   = flag.String("config-dir", "/etc/mihomo", "Mihomo configuration directory")
 	)
 	flag.Parse()
