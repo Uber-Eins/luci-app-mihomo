@@ -4,6 +4,7 @@
 'require ui';
 'require mihomo.api as api';
 'require mihomo.common as common';
+'require mihomo.editor as editor';
 
 function newID() {
 	if (window.crypto && window.crypto.getRandomValues) {
@@ -26,6 +27,7 @@ return view.extend({
 		this.dirty = false;
 		this.previewDigest = null;
 		this.previewDraftRevision = null;
+		this.previewEditor = editor.create({ value: '', readonly: true, label: _('Effective configuration preview'), height: 400 });
 
 		this.root = E('div', { 'class': 'mihomo-page' }, [
 			E('div', { 'class': 'mihomo-head' }, [
@@ -45,9 +47,10 @@ return view.extend({
 			]),
 			E('div', { 'class': 'mihomo-preview-status', 'data-preview': 'status' }, [ _('Save the draft, then generate a preview before applying.') ]),
 			E('div', { 'data-overrides': 'list', 'style': 'margin-top:.85rem' }),
+			common.editorHint(),
 			E('section', { 'class': 'mihomo-card full', 'data-preview': 'panel', 'style': 'display:none' }, [
 				E('div', { 'class': 'mihomo-card-head' }, [ E('h3', {}, [ _('Effective configuration preview') ]), E('code', { 'data-preview': 'digest' }) ]),
-				E('textarea', { 'class': 'cbi-input-textarea mihomo-editor preview', 'readonly': 'readonly', 'spellcheck': 'false', 'data-preview': 'yaml' })
+				this.previewEditor.root
 			])
 		]);
 		this.renderItems();
@@ -68,8 +71,8 @@ return view.extend({
 			const name = E('input', { 'class': 'cbi-input-text mihomo-override-name', 'type': 'text', 'value': item.name, 'placeholder': _('Override name'), 'aria-label': _('Override name') });
 			name.value = item.name;
 			name.addEventListener('input', L.bind(function(event) { item.name = event.target.value; this.changed(); }, this));
-			const content = E('textarea', { 'class': 'cbi-input-textarea mihomo-editor small', 'spellcheck': 'false', 'aria-label': _('Override YAML'), 'keydown': this.handleTab }, [ item.content ]);
-			content.addEventListener('input', L.bind(function(event) { item.content = event.target.value; this.changed(); }, this));
+			const content = editor.create({ value: item.content, label: _('Override YAML'), height: 220 });
+			content.textarea.addEventListener('input', L.bind(function(event) { item.content = event.target.value; this.changed(); }, this));
 			return E('article', { 'class': 'mihomo-override' + (item.enabled ? '' : ' disabled') }, [
 				E('div', { 'class': 'mihomo-override-actions' }, [
 					E('span', { 'class': 'mihomo-override-index' }, [ String(index + 1) ]),
@@ -79,18 +82,10 @@ return view.extend({
 					E('button', { 'class': 'cbi-button', 'type': 'button', 'disabled': index === this.items.length - 1, 'title': _('Move down'), 'click': L.bind(this.moveItem, this, index, 1) }, [ '↓' ]),
 					E('button', { 'class': 'cbi-button cbi-button-negative', 'type': 'button', 'title': _('Delete'), 'click': L.bind(this.deleteItem, this, index) }, [ _('Delete') ])
 				]),
-				content
+				content.root
 			]);
 		}, this));
 		dom.content(container, cards);
-	},
-
-	handleTab: function(event) {
-		if (event.key !== 'Tab') return;
-		event.preventDefault();
-		const field = event.currentTarget;
-		field.setRangeText('  ', field.selectionStart, field.selectionEnd, 'end');
-		field.dispatchEvent(new Event('input', { bubbles: true }));
 	},
 
 	changed: function() {
@@ -172,9 +167,10 @@ return view.extend({
 		}, this)).then(L.bind(function(preview) {
 			this.previewDigest = preview.digest;
 			this.previewDraftRevision = preview.draftRevision;
-			this.root.querySelector('[data-preview="yaml"]').value = preview.yaml;
 			this.root.querySelector('[data-preview="digest"]').textContent = preview.digest.slice(0, 16);
 			this.root.querySelector('[data-preview="panel"]').style.display = '';
+			this.previewEditor.setValue(preview.yaml);
+			this.previewEditor.refresh();
 			const status = this.root.querySelector('[data-preview="status"]');
 			status.className = 'mihomo-preview-status ready';
 			status.textContent = _('Preview is current. Review it, then explicitly apply it.');

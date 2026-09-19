@@ -63,6 +63,17 @@ function text(node, value) {
 		node.textContent = value == null ? '—' : String(value);
 }
 
+function editorHint() {
+	const key = function(label) { return E('kbd', {}, [ label ]); };
+	return E('div', { 'class': 'mihomo-muted mihomo-editor-hint' }, [
+		_('Editor shortcuts: '),
+		key('Tab'), ' / ', key('Shift'), '+', key('Tab'), ' ', _('indent or outdent'), ' · ',
+		key('Enter'), ' ', _('keeps and extends indentation'), ' · ',
+		key('Ctrl'), '+', key('/'), ' ', _('toggles comments'), ' · ',
+		key('Ctrl'), '+', key('Z'), ' ', _('undo')
+	]);
+}
+
 return L.Class.extend({
 	ensureStyle: ensureStyle,
 	formatBytes: formatBytes,
@@ -71,5 +82,6 @@ return L.Class.extend({
 	notifyError: notifyError,
 	notifySuccess: notifySuccess,
 	setBusy: setBusy,
-	text: text
+	text: text,
+	editorHint: editorHint
 });

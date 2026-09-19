@@ -4,6 +4,7 @@
 'require ui';
 'require mihomo.api as api';
 'require mihomo.common as common';
+'require mihomo.editor as editor';
 
 return view.extend({
 	load: function() {
@@ -14,23 +15,20 @@ return view.extend({
 	render: function(data) {
 		this.data = data;
 		this.dirty = false;
-		const baseEditor = E('textarea', {
-			'class': 'cbi-input-textarea mihomo-editor',
-			'spellcheck': 'false',
-			'aria-label': _('Base Mihomo configuration'),
-			'data-editor': 'base',
-			'input': L.bind(function() { this.dirty = true; this.updateDirtyState(); }, this),
-			'keydown': this.handleTab
-		}, [ data.base ]);
-		const effectiveEditor = E('textarea', {
-			'class': 'cbi-input-textarea mihomo-editor',
-			'spellcheck': 'false',
-			'readonly': 'readonly',
-			'aria-label': _('Effective Mihomo configuration'),
-			'data-editor': 'effective'
-		}, [ data.effective ]);
-		const basePane = E('div', { 'data-pane': 'base' }, [ baseEditor ]);
-		const effectivePane = E('div', { 'data-pane': 'effective', 'style': 'display:none' }, [ effectiveEditor ]);
+		this.baseEditor = editor.create({
+			value: data.base,
+			label: _('Base Mihomo configuration'),
+			height: 520
+		});
+		this.baseEditor.textarea.addEventListener('input', L.bind(function() { this.dirty = true; this.updateDirtyState(); }, this));
+		this.effectiveEditor = editor.create({
+			value: data.effective,
+			readonly: true,
+			label: _('Effective Mihomo configuration'),
+			height: 520
+		});
+		const basePane = E('div', { 'data-pane': 'base' }, [ this.baseEditor.root ]);
+		const effectivePane = E('div', { 'data-pane': 'effective', 'style': 'display:none' }, [ this.effectiveEditor.root ]);
 		const applyButton = E('button', {
 			'class': 'cbi-button cbi-button-apply',
 			'type': 'button',
@@ -58,6 +56,7 @@ return view.extend({
 				]),
 				basePane,
 				effectivePane,
+				common.editorHint(),
 				E('div', { 'class': 'mihomo-muted', 'style': 'margin-top:.55rem' }, [
 					E('span', {}, [ _('Source revision: ') ]), E('code', { 'data-revision': 'base' }, [ data.baseRevision.slice(0, 12) ]),
 					E('span', { 'style': 'margin-left:1rem' }, [ _('Effective revision: ') ]), E('code', { 'data-revision': 'effective' }, [ data.effectiveRevision.slice(0, 12) ])
@@ -67,19 +66,10 @@ return view.extend({
 		return this.root;
 	},
 
-	handleTab: function(event) {
-		if (event.key !== 'Tab')
-			return;
-		event.preventDefault();
-		const field = event.currentTarget;
-		const start = field.selectionStart;
-		field.setRangeText('  ', start, field.selectionEnd, 'end');
-		field.dispatchEvent(new Event('input', { bubbles: true }));
-	},
-
 	selectTab: function(name) {
 		this.root.querySelectorAll('[data-pane]').forEach(function(pane) { pane.style.display = pane.getAttribute('data-pane') === name ? '' : 'none'; });
 		this.root.querySelectorAll('[data-tab]').forEach(function(tab) { tab.classList.toggle('active', tab.getAttribute('data-tab') === name); });
+		(name === 'base' ? this.baseEditor : this.effectiveEditor).refresh();
 	},
 
 	updateDirtyState: function() {
@@ -93,8 +83,8 @@ return view.extend({
 			return;
 		return api.write('config-get', {}).then(L.bind(function(data) {
 			this.data = data;
-			this.root.querySelector('[data-editor="base"]').value = data.base;
-			this.root.querySelector('[data-editor="effective"]').value = data.effective;
+			this.baseEditor.setValue(data.base);
+			this.effectiveEditor.setValue(data.effective);
 			this.root.querySelector('[data-revision="base"]').textContent = data.baseRevision.slice(0, 12);
 			this.root.querySelector('[data-revision="effective"]').textContent = data.effectiveRevision.slice(0, 12);
 			this.dirty = false;
@@ -103,8 +93,13 @@ return view.extend({
 	},
 
 	apply: function(event) {
-		const content = this.root.querySelector('[data-editor="base"]').value;
-		if (!window.confirm(_('Validate this source configuration and replace the effective Mihomo configuration?')))
+		const content = this.baseEditor.getValue();
+		const problems = this.baseEditor.problems.length;
+		const question = problems
+			? N_('The editor reports %d YAML problem. Validate this source configuration anyway and replace the effective Mihomo configuration?',
+				'The editor reports %d YAML problems. Validate this source configuration anyway and replace the effective Mihomo configuration?', problems).format(problems)
+			: _('Validate this source configuration and replace the effective Mihomo configuration?');
+		if (!window.confirm(question))
 			return;
 		const button = event.currentTarget;
 		common.setBusy(button, true);

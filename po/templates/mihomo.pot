@@ -8,6 +8,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgid "Mihomo"
 msgstr ""
@@ -149,3 +150,94 @@ msgstr ""
 
 msgid "Clear view"
 msgstr ""
+
+msgid "Spaces: %d"
+msgstr ""
+
+msgid "Read-only"
+msgstr ""
+
+msgid "No problems"
+msgstr ""
+
+msgid "Show or hide the problem list"
+msgstr ""
+
+msgid "Highlighting disabled for large content"
+msgstr ""
+
+msgid "Ln %d"
+msgstr ""
+
+msgid "Ln %d, Col %d"
+msgstr ""
+
+msgid "(%d selected)"
+msgstr ""
+
+msgid "Tab characters are not allowed in YAML indentation; use spaces."
+msgstr ""
+
+msgid "Inconsistent indentation: this line does not align with any enclosing level."
+msgstr ""
+
+msgid "Unexpected indentation: the entry above already has a value on the same line."
+msgstr ""
+
+msgid "A sequence entry (-) is not allowed here; the entry above already has a value."
+msgstr ""
+
+msgid "Expected a sequence entry (-) at this indentation."
+msgstr ""
+
+msgid "Expected a 'key: value' pair or a sequence entry here."
+msgstr ""
+
+msgid "Duplicate key '%s' in the same mapping."
+msgstr ""
+
+msgid "Nested 'key: value' inside a plain value is not allowed; quote the value or move it to its own line."
+msgstr ""
+
+msgid "Unterminated quoted string."
+msgstr ""
+
+msgid "Unclosed flow collection: a [ or { is never closed."
+msgstr ""
+
+msgid "Editor shortcuts: "
+msgstr ""
+
+msgid "indent or outdent"
+msgstr ""
+
+msgid "keeps and extends indentation"
+msgstr ""
+
+msgid "toggles comments"
+msgstr ""
+
+msgid "undo"
+msgstr ""
+
+msgid "Base Mihomo configuration"
+msgstr ""
+
+msgid "Effective Mihomo configuration"
+msgstr ""
+
+msgid "Override YAML"
+msgstr ""
+
+msgid "Validate this source configuration and replace the effective Mihomo configuration?"
+msgstr ""
+
+msgid "%d problem"
+msgid_plural "%d problems"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "The editor reports %d YAML problem. Validate this source configuration anyway and replace the effective Mihomo configuration?"
+msgid_plural "The editor reports %d YAML problems. Validate this source configuration anyway and replace the effective Mihomo configuration?"
+msgstr[0] ""
+msgstr[1] ""

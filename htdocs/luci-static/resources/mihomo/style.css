@@ -254,26 +254,295 @@
 }
 
 .mihomo-mono,
-.mihomo-editor,
 .mihomo-log-view {
 	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.mihomo-editor {
-	width: 100%;
-	min-height: 480px;
-	padding: .8rem;
-	box-sizing: border-box;
-	resize: vertical;
-	line-height: 1.5;
-	font-size: .84rem;
-	tab-size: 2;
-	white-space: pre;
+/* ---- YAML code editor ---- */
+
+.mihomo-code {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	border: 1px solid #3c3c3c;
+	border-radius: .55rem;
+	overflow: hidden;
+	background: #1e1e1e;
+	color: #d4d4d4;
+	color-scheme: dark;
 }
 
-.mihomo-editor.small { min-height: 190px; }
-.mihomo-editor.preview { min-height: 360px; }
-.mihomo-editor[readonly] { opacity: .8; }
+.mihomo-code:focus-within {
+	border-color: #007fd4;
+	box-shadow: 0 0 0 1px #007fd4;
+}
+
+.mihomo-code-text {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+	font-size: .84rem !important;
+	font-weight: 400 !important;
+	font-style: normal !important;
+	line-height: 1.5 !important;
+	letter-spacing: normal !important;
+	word-spacing: normal !important;
+	font-variant-ligatures: none !important;
+	font-feature-settings: normal !important;
+	-moz-tab-size: 2 !important;
+	tab-size: 2 !important;
+	white-space: pre !important;
+	word-break: normal !important;
+	overflow-wrap: normal !important;
+	text-transform: none !important;
+}
+
+.mihomo-code-main {
+	position: relative;
+	display: flex;
+	align-items: stretch;
+	min-width: 0;
+}
+
+/*
+ * The gutter's numbers are absolutely positioned so that they never add to
+ * the row height; the editor height is dictated by the textarea alone.
+ */
+.mihomo-code-gutter {
+	position: relative;
+	flex: 0 0 auto;
+	box-sizing: border-box;
+	overflow: hidden;
+	background: #1e1e1e;
+	color: #858585;
+	text-align: right;
+	user-select: none;
+	-webkit-user-select: none;
+	border-right: 1px solid #2b2b2b;
+}
+
+.mihomo-code-gutter-inner {
+	position: absolute;
+	top: .8rem;
+	left: 0;
+	right: 0;
+	padding: 0 .7rem 0 .5rem;
+	will-change: transform;
+}
+
+.mihomo-code-gutter-inner span {
+	display: block;
+}
+
+.mihomo-code-gutter-inner span.active {
+	color: #c6c6c6;
+}
+
+.mihomo-code-gutter-inner span.err {
+	color: #f14c4c;
+	font-weight: 600 !important;
+}
+
+.mihomo-code-body {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.mihomo-code pre.mihomo-code-highlight {
+	position: absolute;
+	inset: 0;
+	margin: 0 !important;
+	padding: .8rem !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	box-sizing: border-box;
+	overflow: hidden !important;
+	background: transparent !important;
+	color: inherit !important;
+	box-shadow: none !important;
+	pointer-events: none;
+}
+
+.mihomo-code pre.mihomo-code-highlight code {
+	display: block;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	background: transparent !important;
+	color: inherit !important;
+	will-change: transform;
+}
+
+.mihomo-code-cursorline {
+	position: absolute;
+	left: 0;
+	right: 0;
+	background: rgba(255, 255, 255, .045);
+	pointer-events: none;
+}
+
+.mihomo-code textarea.mihomo-code-input {
+	position: relative;
+	z-index: 1;
+	display: block;
+	width: 100% !important;
+	max-width: none !important;
+	min-height: 120px !important;
+	max-height: none !important;
+	margin: 0 !important;
+	padding: .8rem !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	outline: none !important;
+	box-shadow: none !important;
+	box-sizing: border-box;
+	background: transparent !important;
+	color: transparent !important;
+	-webkit-text-fill-color: transparent;
+	caret-color: #f5f5f5;
+	resize: vertical;
+	overflow: auto;
+	text-shadow: none !important;
+	transition: none !important;
+}
+
+/* The selection paints above the highlighted text, so it must stay translucent. */
+.mihomo-code textarea.mihomo-code-input::selection {
+	background: rgba(64, 120, 180, .45);
+	color: transparent;
+	-webkit-text-fill-color: transparent;
+}
+
+.mihomo-code textarea.mihomo-code-input::-moz-selection {
+	background: rgba(64, 120, 180, .45);
+	color: transparent;
+}
+
+.mihomo-code-status {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: .75rem;
+	flex-wrap: wrap;
+	padding: .28rem .75rem;
+	background: #007acc;
+	color: #fff;
+	font-size: .74rem;
+	line-height: 1.4;
+}
+
+.mihomo-code.readonly .mihomo-code-status {
+	background: #4b5563;
+}
+
+.mihomo-code-status-left,
+.mihomo-code-status-right {
+	display: flex;
+	align-items: center;
+	gap: .9rem;
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.mihomo-code-status-item {
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.mihomo-code-status-item:empty {
+	display: none;
+}
+
+.mihomo-code-status-problems.ok::before {
+	content: '\2713\00a0';
+}
+
+.mihomo-code-status-problems.bad {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.mihomo-code-status-problems.bad::before {
+	content: '\26a0\00a0';
+}
+
+.mihomo-code-problems {
+	max-height: 170px;
+	overflow: auto;
+	border-top: 1px solid #3c3c3c;
+	background: #252526;
+}
+
+.mihomo-code button.mihomo-code-problem {
+	display: flex;
+	gap: .6rem;
+	width: 100%;
+	margin: 0;
+	padding: .35rem .75rem;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: #d4d4d4;
+	font: inherit;
+	font-size: .8rem;
+	line-height: 1.4;
+	text-align: left;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.mihomo-code button.mihomo-code-problem:hover,
+.mihomo-code button.mihomo-code-problem:focus-visible {
+	background: #2a2d2e;
+	color: #fff;
+}
+
+.mihomo-code-problem-line {
+	flex: 0 0 auto;
+	min-width: 4.2rem;
+	color: #9cdcfe;
+	font-variant-numeric: tabular-nums;
+}
+
+.mihomo-code .y-key { color: #9cdcfe; }
+.mihomo-code .y-str { color: #ce9178; }
+.mihomo-code .y-num { color: #b5cea8; }
+.mihomo-code .y-bool,
+.mihomo-code .y-null,
+.mihomo-code .y-block { color: #569cd6; }
+.mihomo-code .y-cmt { color: #6a9955; font-style: italic; }
+.mihomo-code .y-punct { color: #d4d4d4; }
+.mihomo-code .y-anchor,
+.mihomo-code .y-alias { color: #dcdcaa; }
+.mihomo-code .y-tag { color: #4ec9b0; }
+.mihomo-code .y-doc,
+.mihomo-code .y-dir { color: #c586c0; }
+.mihomo-code .y-tab { background: rgba(241, 76, 76, .35); }
+.mihomo-code .y-bad {
+	color: #f14c4c;
+	text-decoration: underline wavy #f14c4c;
+	text-decoration-skip-ink: none;
+}
+.mihomo-code .y-err {
+	background: rgba(241, 76, 76, .12);
+	text-decoration: underline wavy rgba(241, 76, 76, .9);
+	text-decoration-skip-ink: none;
+}
+
+.mihomo-editor-hint {
+	margin-top: .55rem;
+	font-size: .8rem;
+}
+
+.mihomo-editor-hint kbd {
+	display: inline-block;
+	padding: 0 .35em;
+	border: 1px solid var(--mihomo-border);
+	border-bottom-width: 2px;
+	border-radius: .3em;
+	font-family: inherit;
+	font-size: .92em;
+	line-height: 1.5;
+}
 
 .mihomo-tabs {
 	display: flex;
@@ -295,6 +564,10 @@
 }
 
 .mihomo-override.disabled { opacity: .66; }
+
+.mihomo-override .mihomo-code {
+	margin-top: .6rem;
+}
 
 .mihomo-override-name {
 	flex: 1 1 220px;
@@ -367,7 +640,6 @@
 	.mihomo-card.metric,
 	.mihomo-card.wide,
 	.mihomo-card.full { grid-column: 1; }
-	.mihomo-editor { min-height: 55vh; }
 	.mihomo-head { align-items: flex-start; }
 	.mihomo-realtime-values { justify-content: flex-start; }
 	.mihomo-live-speed { min-width: 7rem; }
